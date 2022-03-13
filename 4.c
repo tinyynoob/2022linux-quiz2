@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define SIZE 10000
+#define SIZE 1000
+#define ITER 100
 
 static size_t naive(uint64_t *bitmap, size_t bitmapsize, uint32_t *out)
 {
@@ -27,7 +28,7 @@ static size_t improved(uint64_t *bitmap, size_t bitmapsize, uint32_t *out)
     for (size_t k = 0; k < bitmapsize; ++k) {
         bitset = bitmap[k];
         while (bitset != 0) {
-            uint64_t t = 1u << __builtin_ctzll(bitset);
+            uint64_t t = 1ul << __builtin_ctzll(bitset);
             int r = __builtin_ctzll(bitset);
             out[pos++] = k * 64 + r;
             bitset ^= t;
@@ -59,13 +60,27 @@ static uint64_t gen_bm(int set_num)
 int main(int argc, char *argv[])
 {
     const int weight = atoi(argv[1]);
-    printf("weight = %d\n", weight);
     srand(time(NULL));
 
-    uint64_t bitmap[SIZE];
-    uint32_t out[SIZE * 2];
-    for (int i = 0; i < SIZE; i++)
-        bitmap[i] = gen_bm(weight);
+    unsigned long long total_nai = 0, total_imp = 0;
+    for (int i = 0; i < ITER; i++) {
+        uint64_t bitmap[SIZE];
+        for (int j = 0; j < SIZE; j++)
+            bitmap[j] = gen_bm(weight);
 
+        struct timespec t1, t2, t3;
+        uint32_t out[SIZE * 64];
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        naive(bitmap, SIZE, out);
+        clock_gettime(CLOCK_MONOTONIC, &t2);
+        improved(bitmap, SIZE, out);
+        clock_gettime(CLOCK_MONOTONIC, &t3);
+
+        total_nai += (unsigned long long) (t2.tv_sec * 1e9 + t2.tv_nsec) -
+                     (t1.tv_sec * 1e9 + t1.tv_nsec);
+        total_imp += (unsigned long long) (t3.tv_sec * 1e9 + t3.tv_nsec) -
+                     (t2.tv_sec * 1e9 + t2.tv_nsec);
+        printf("%d,%llu,%llu\n", (i + 1) * SIZE, total_nai, total_imp);
+    }
     return 0;
 }
